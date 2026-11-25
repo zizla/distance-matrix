@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Distance metrics — 9가지 거리 측정 방식</title>
+<style>
+:root{--bg:#E5E7EB;--ink:#111827;--A:#EF4444;--B:#2563EB;--gray:#9CA3AF;--pur:#9331E9;--mute:#6B7280;--hi:#FEF3C7}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--ink);padding:10px 16px}
+h1{font-size:18px;margin:0 0 8px;font-weight:700;letter-spacing:-.2px}
+h1 .em{font-weight:500;color:var(--mute)}
+.ctrl{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;font-size:13px;border:1px solid var(--ink);background:#fff;color:var(--ink);padding:5px 10px;border-radius:6px;cursor:pointer;line-height:1.2}
+button:hover{background:#F3F4F6}
+button.on{background:var(--ink);color:#fff}
+button.pp{border-color:var(--pur);color:var(--pur)}
+button.pp.on{background:var(--pur);color:#fff}
+.pbox{display:flex;align-items:center;gap:8px;border:1px solid #D1D5DB;border-radius:8px;padding:4px 8px;flex-wrap:wrap}
+.pbox input[type=range]{width:150px;accent-color:var(--pur)}
+.pval{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--pur);font-weight:700;min-width:70px}
+.pbox label{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:4px;cursor:pointer}
+.legend{display:flex;gap:10px;font-size:12px;color:var(--mute);align-items:center}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:3px;vertical-align:-1px}
+.hint{font-size:12px;color:var(--mute)}
+main{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;padding:16px;max-width:1400px;margin:0 auto}
+@media(max-width:1020px){main{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:660px){header{position:static}main{grid-template-columns:1fr;padding:10px;gap:10px}h1{font-size:15px}.pbox input[type=range]{width:120px}}
+.card{background:#fff;border:1px solid var(--ink);display:flex;flex-direction:column;position:relative;min-width:0}
+.hd{display:flex;align-items:center;gap:8px;padding:10px 12px 2px}
+.num{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--mute)}
+.ttl{font-weight:700;font-size:15px;flex:1}
+.ttl small{font-weight:500;color:var(--mute);font-size:12px;margin-left:4px}
+.q{width:22px;height:22px;border-radius:50%;padding:0;font-size:12px;font-weight:700;flex:none}
+.fx{padding:2px 12px 8px;font-family:"Cambria Math","STIX Two Math","Latin Modern Math","Times New Roman",serif;font-size:16px;min-height:28px;white-space:nowrap;overflow-x:auto}
+.fx.small{font-size:13.5px}
+canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;border-top:1px dashed #E5E7EB;border-bottom:1px dashed #E5E7EB;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.ft{display:flex;justify-content:space-between;align-items:center;padding:8px 12px 2px;gap:10px}
+.val{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:20px;font-weight:700;white-space:nowrap}
+.sub{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;color:var(--mute);text-align:right;line-height:1.45}
+.use{padding:3px 12px 10px;font-size:12px;color:var(--mute);line-height:1.45}
+.use b{color:var(--ink);font-weight:600}
+.tip{display:none;position:absolute;top:38px;left:10px;right:10px;background:var(--ink);color:#fff;font-size:13px;line-height:1.6;padding:10px 12px;border-radius:8px;z-index:5;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.card.showtip .tip{display:block}
+footer{max-width:1400px;margin:0 auto;padding:0 16px 24px;font-size:12px;color:var(--mute);line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <h1><span data-k="h1a">Distance metrics</span> <span class="em" data-k="h1b"></span></h1>
+  <div class="ctrl">
+    <button id="play" class="on"></button>
+    <button id="reset" data-k="reset"></button>
+    <div class="pbox">
+      <span style="font-weight:700;color:var(--pur)">Minkowski</span>
+      <input id="pslider" type="range" min="1" max="10" step="0.01" value="3.82" aria-label="Minkowski p">
+      <span class="pval" id="pval">p = 3.82</span>
+      <button class="pp" data-p="1" data-k="p1"></button>
+      <button class="pp" data-p="2" data-k="p2"></button>
+      <button class="pp" data-p="inf" data-k="pinf"></button>
+      <label><input type="checkbox" id="pauto" checked><span data-k="pauto"></span></label>
+    </div>
+    <button id="lang"></button>
+    <span class="legend"><span><i class="dot" style="background:var(--A)"></i>A</span><span><i class="dot" style="background:var(--B)"></i>B</span></span>
+    <span class="hint" data-k="hint"></span>
+  </div>
+</header>
+<main id="grid"></main>
+<footer data-k="foot"></footer>
+
+<script>
+"use strict";
+/* ============================== 텍스트(한/영) ============================== */
+const T = {
+ ko:{
+  h1b:"— A와 B가 얼마나 떨어져 있는지 측정하는 9가지 방법",
+  play:"⏸ 일시정지", paused:"▶ 자동 애니메이션", reset:"초기화",
+  p1:"p=1 (맨해튼)", p2:"p=2 (유클리드)", pinf:"p=∞ (체비쇼프)", pauto:"p 자동 왕복",
+  lang:"English", hint:"점·벡터·원을 드래그하거나 비트를 탭해 보세요",
+  t_euc:["Euclidean","유클리드 거리"], t_cos:["Cosine","코사인 유사도"], t_ham:["Hamming","해밍 거리"],
+  t_man:["Manhattan","맨해튼 거리"], t_mink:["Minkowski","민코프스키 거리"], t_cheb:["Chebyshev","체비쇼프 거리"],
+  t_jac:["Jaccard","자카드 유사도"], t_hav:["Haversine","하버사인 · 대권 거리"], t_dice:["Sørensen–Dice","쇠렌센–다이스 계수"],
+  u_euc:"<b>언제?</b> 직선거리 · k-NN · k-평균 군집 (변수 표준화 필요)",
+  u_cos:"<b>언제?</b> 문서·임베딩 유사도(NLP) · 추천시스템 — 크기 무시, 방향만",
+  u_ham:"<b>언제?</b> 같은 길이의 비트열·문자열 · 오류정정부호 · 이진 해시",
+  u_man:"<b>언제?</b> 격자형 도로 이동 · 고차원 데이터 · 이상치에 덜 민감",
+  u_mink:"<b>언제?</b> L1·L2·L∞의 일반화 · k-NN의 p 하이퍼파라미터",
+  u_cheb:"<b>언제?</b> 체스 킹의 이동 수 · 두 축 동시 이동 장비 · 최대 허용오차 검사",
+  u_jac:"<b>언제?</b> 장바구니·태그·키워드 집합 비교 · 중복 문서 탐지",
+  u_hav:"<b>언제?</b> GPS 좌표 간 거리 · 배송 경로 · 상권 반경 분석",
+  u_dice:"<b>언제?</b> 이미지 분할(세그멘테이션) 평가 · 문자열 바이그램 유사도",
+  q_euc:"두 점을 잇는 직선의 길이(피타고라스 정리). 변수 단위가 다르면 큰 단위 변수가 거리를 지배하므로 표준화가 필요합니다. 항상 L∞ ≤ L2 ≤ L1.",
+  q_cos:"두 벡터 사이 각도의 코사인. 벡터를 늘이거나 줄여도(같은 방향이면) 값이 변하지 않습니다. 회색 점선 위로 끝점을 끌어 보세요. 거리로 쓸 때는 d = 1 − cos θ.",
+  q_ham:"같은 위치에서 서로 다른 기호의 개수. 길이가 같은 두 열에만 정의됩니다. 비트를 탭하면 0/1이 바뀝니다. 아래 줄은 A ⊕ B(XOR)입니다.",
+  q_man:"축을 따라서만 이동할 때의 거리(택시 거리). 꺾는 순서와 관계없이 경로 길이는 |Δx|+|Δy|로 같습니다(옅은 점선 경로 참고).",
+  q_mink:"p로 조절되는 거리의 가족. 보라색 도형은 A에서 거리가 d인 점들의 집합(L_p 단위구)이며, B는 항상 그 경계 위에 있습니다. p=1 마름모 → p=2 원 → p→∞ 정사각형.",
+  q_cheb:"두 축 중 더 큰 차이만 셉니다(L∞). A를 중심으로 한 점선 정사각형 위의 모든 점이 같은 거리입니다.",
+  q_jac:"교집합 크기 ÷ 합집합 크기. 이 그림에서는 두 원의 넓이를 집합 크기의 연속적 비유로 사용합니다(겹친 면적 / 전체 면적). 원을 좌우로 끌어 보세요.",
+  q_hav:"구면 위 두 점 사이 최단 경로(대권)의 길이. 지구를 반지름 6,371 km 구로 가정하므로 타원체 기준 측정과는 최대 약 0.5% 차이가 날 수 있습니다. A·B를 끌거나 지구를 돌려 보세요.",
+  q_dice:"2 × 교집합 ÷ 두 집합 크기의 합. 같은 겹침에서 항상 DSC ≥ J이며 DSC = 2J/(1+J) 관계가 성립합니다. 오른쪽 곡선의 점이 현재 상태입니다.",
+  diff:"다른 비트", foot:"원작 아이디어: X @mathemetica — “Nine ways to measure how far apart A and B are”. Jaccard·Dice 카드는 두 원의 면적을 집합 크기의 연속적 비유로 계산합니다. Haversine은 구면 지구(r = 6,371 km) 가정입니다."
+ },
+ en:{
+  h1b:"— Nine ways to measure how far apart A and B are",
+  play:"⏸ Pause", paused:"▶ Auto-play", reset:"Reset",
+  p1:"p=1 (Manhattan)", p2:"p=2 (Euclidean)", pinf:"p=∞ (Chebyshev)", pauto:"auto p sweep",
+  lang:"한국어", hint:"Drag points, vectors, circles — tap bits",
+  t_euc:["Euclidean",""], t_cos:["Cosine",""], t_ham:["Hamming",""],
+  t_man:["Manhattan",""], t_mink:["Minkowski",""], t_cheb:["Chebyshev",""],
+  t_jac:["Jaccard",""], t_hav:["Haversine","great-circle"], t_dice:["Sørensen–Dice",""],
+  u_euc:"<b>Use:</b> straight-line distance · k-NN · k-means (standardize features)",
+  u_cos:"<b>Use:</b> text/embedding similarity (NLP) · recommenders — direction only",
+  u_ham:"<b>Use:</b> equal-length bit strings · error-correcting codes · binary hashes",
+  u_man:"<b>Use:</b> grid-like travel · high-dimensional data · less outlier-sensitive",
+  u_mink:"<b>Use:</b> generalizes L1/L2/L∞ · the p hyper-parameter of k-NN",
+  u_cheb:"<b>Use:</b> king moves in chess · two-axis simultaneous motion · max tolerance checks",
+  u_jac:"<b>Use:</b> basket / tag / keyword set overlap · near-duplicate detection",
+  u_hav:"<b>Use:</b> distance between GPS coordinates · delivery · trade-area radius",
+  u_dice:"<b>Use:</b> image segmentation scoring · string bigram similarity",
+  q_euc:"Length of the straight segment (Pythagoras). Features on large scales dominate, so standardize first. Always L∞ ≤ L2 ≤ L1.",
+  q_cos:"Cosine of the angle between two vectors. Stretching a vector along its direction leaves it unchanged — drag a tip along the dotted ray. As a distance: d = 1 − cos θ.",
+  q_ham:"Number of positions where the symbols differ; defined only for equal lengths. Tap a bit to flip it. Bottom row is A ⊕ B (XOR).",
+  q_man:"Distance when moving only along the axes (taxicab). Either L-shaped route has the same length |Δx|+|Δy| (faint dashed route).",
+  q_mink:"A family of distances indexed by p. The purple shape is every point at distance d from A (the L_p ball); B always sits on its boundary. p=1 diamond → p=2 circle → p→∞ square.",
+  q_cheb:"Only the larger axis difference counts (L∞). Every point on the dashed square around A is equally far.",
+  q_jac:"Intersection size ÷ union size. Here circle areas are a continuous stand-in for set sizes (overlap area / total area). Drag a circle sideways.",
+  q_hav:"Length of the shortest path on a sphere (great circle). Assumes a spherical Earth with r = 6,371 km, so it can differ from ellipsoidal results by up to about 0.5%. Drag A/B or spin the globe.",
+  q_dice:"2 × intersection ÷ sum of sizes. For the same overlap DSC ≥ J, with DSC = 2J/(1+J). The dot on the right curve is the current state.",
+  diff:"differing", foot:"Idea after X @mathemetica — “Nine ways to measure how far apart A and B are”. Jaccard and Dice cards use circle areas as a continuous analogue of set sizes. Haversine assumes a spherical Earth (r = 6,371 km)."
+ }
+};
+
+const CARDS = [
+ {id:'euc',  g:'plane', fx:'d = √(Δx² + Δy²)'},
+ {id:'cos',  g:'cos',   fx:'cos θ = (a · b) / (‖a‖ ‖b‖)'},
+ {id:'ham',  g:'ham',   fx:'d<sub>H</sub> = #{ i : a<sub>i</sub> ≠ b<sub>i</sub> }'},
+ {id:'man',  g:'plane', fx:'d = |Δx| + |Δy|'},
+ {id:'mink', g:'plane', fx:'d<sub>p</sub> = ( |Δx|<sup>p</sup> + |Δy|<sup>p</sup> )<sup>1/p</sup>'},
+ {id:'cheb', g:'plane', fx:'d = max( |Δx|, |Δy| )'},
+ {id:'jac',  g:'set',   fx:'J = |A ∩ B| / |A ∪ B|'},
+ {id:'hav',  g:'geo',   fx:'d = 2r · arcsin √( sin²(Δφ/2) + cos φ₁ cos φ₂ sin²(Δλ/2) )', small:true},
+ {id:'dice', g:'set',   fx:'DSC = 2|A ∩ B| / ( |A| + |B| )'},
+];
+
+/* ============================== 상태 ============================== */
+const D = Math.PI/180, R_EARTH = 6371;
+const C = {A:'#EF4444', B:'#2563EB', ink:'#111827', gray:'#9CA3AF', pur:'#9331E9', purF:'rgba(147,51,234,0.18)', hi:'#FEF3C7', mute:'#6B7280', grid:'#EEF0F3', teal:'#0F766E'};
+let S;
+function initState(){
+ S = {
+  lang: S ? S.lang : 'ko', playing:true,
+  A:{x:-3.0,y:-2.3}, B:{x:3.4,y:3.9},
+  p:3.82, pInf:false, pAuto:true,
+  cos:{a:{x:4.0,y:1.3}, b:{x:2.2,y:3.4}},
+  bitsA:[1,0,1,1,0,0,1,0], bitsB:[1,0,0,1,0,1,1,0], flA:Array(8).fill(0), flB:Array(8).fill(0), hamClock:0,
+  setD:1.2,
+  gA:{lat:37.57,lon:126.98}, gB:{lat:35.0,lon:180}, view:{lat0:30,lon0:150},
+  t:{plane:0,cos:0,ham:0,set:0,geo:0,p:4.4},
+  hold:{plane:0,cos:0,ham:0,set:0,geo:0},
+ };
+}
+initState();
+const now = ()=>performance.now();
+const active = g => S.playing && now() > S.hold[g];
+
+/* ============================== DOM 생성 ============================== */
+const grid = document.getElementById('grid');
+const el = {};
+CARDS.forEach((c,i)=>{
+ const d = document.createElement('section');
+ d.className='card'; d.id='card-'+c.id;
+ d.innerHTML = `
+  <div class="hd"><span class="num">${String(i+1).padStart(2,'0')}</span><span class="ttl"></span><button class="q" aria-label="help">?</button></div>
+  <div class="fx${c.small?' small':''}">${c.fx}</div>
+  <canvas></canvas>
+  <div class="ft"><span class="val"></span><span class="sub"></span></div>
+  <div class="use"></div>
+  <div class="tip"></div>`;
+ grid.appendChild(d);
+ el[c.id] = {card:d, cv:d.querySelector('canvas'), val:d.querySelector('.val'), sub:d.querySelector('.sub'), ttl:d.querySelector('.ttl'), use:d.querySelector('.use'), tip:d.querySelector('.tip'), g:c.g};
+ d.querySelector('.q').addEventListener('click', e=>{ e.stopPropagation(); document.querySelectorAll('.card.showtip').forEach(x=>{ if(x!==d) x.classList.remove('showtip'); }); d.classList.toggle('showtip'); });
+ el[c.id].tip.addEventListener('click', ()=>d.classList.remove('showtip'));
+});
+document.addEventListener('click', ()=>document.querySelectorAll('.card.showtip').forEach(x=>x.classList.remove('showtip')));
+
+function applyLang(){
+ const L = T[S.lang];
+ document.documentElement.lang = S.lang;
+ document.querySelectorAll('[data-k]').forEach(n=>{ const k=n.dataset.k; if(L[k]!==undefined) n.textContent = L[k]; });
+ CARDS.forEach(c=>{
+  const [a,b] = L['t_'+c.id];
+  el[c.id].ttl.innerHTML = a + (b?`<small>${b}</small>`:'');
+  el[c.id].use.innerHTML = L['u_'+c.id];
+  el[c.id].tip.textContent = L['q_'+c.id];
+ });
+ document.getElementById('lang').textContent = L.lang;
+ syncPlay();
+}
+function syncPlay(){ const b=document.getElementById('play'); b.textContent = S.playing ? T[S.lang].play : T[S.lang].paused; b.classList.toggle('on', S.playing); }
+
+/* ============================== 캔버스 크기 ============================== */
+const DPR = ()=>Math.min(window.devicePixelRatio||1, 2.5);
+function fit(cv){
+ const r = cv.getBoundingClientRect(), dpr = DPR();
+ cv._w = r.width; cv._h = r.height;
+ cv.width = Math.round(r.width*dpr); cv.height = Math.round(r.height*dpr);
+ const ctx = cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); cv._ctx = ctx;
+}
+const ro = new ResizeObserver(es=>es.forEach(e=>fit(e.target)));
+Object.values(el).forEach(o=>{ fit(o.cv); ro.observe(o.cv); });
+
+/* ============================== 그리기 도우미 ============================== */
+function arrowHead(ctx,x1,y1,x2,y2,s){ const a=Math.atan2(y2-y1,x2-x1); ctx.beginPath(); ctx.moveTo(x2,y2); ctx.lineTo(x2-s*Math.cos(a-0.42),y2-s*Math.sin(a-0.42)); ctx.lineTo(x2-s*Math.cos(a+0.42),y2-s*Math.sin(a+0.42)); ctx.closePath(); ctx.fill(); }
+function arrow(ctx,x1,y1,x2,y2,o={}){
+ const color=o.color||C.ink, w=o.w||2, head=o.head||9, pad1=o.pad1||0, pad2=o.pad2||0;
+ let L=Math.hypot(x2-x1,y2-y1); if(L<pad1+pad2+4) return;
+ const ux=(x2-x1)/L, uy=(y2-y1)/L;
+ x1+=ux*pad1; y1+=uy*pad1; x2-=ux*pad2; y2-=uy*pad2;
+ ctx.save(); ctx.strokeStyle=ctx.fillStyle=color; ctx.lineWidth=w; ctx.lineCap='round';
+ if(o.dash) ctx.setLineDash(o.dash);
+ const s1=o.both?head*0.75:0, s2=o.noHead?0:head*0.75;
+ ctx.beginPath(); ctx.moveTo(x1+ux*s1,y1+uy*s1); ctx.lineTo(x2-ux*s2,y2-uy*s2); ctx.stroke(); ctx.setLineDash([]);
+ if(!o.noHead) arrowHead(ctx,x1,y1,x2,y2,head);
+ if(o.both) arrowHead(ctx,x2,y2,x1,y1,head);
+ ctx.restore();
+}
+function line(ctx,x1,y1,x2,y2,color,w=1,dash=null){ ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=w; if(dash) ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.restore(); }
+function label(ctx,s,x,y,o={}){
+ ctx.save(); ctx.font=`${o.weight||600} ${o.size||12}px ui-monospace,SFMono-Regular,Menlo,monospace`;
+ ctx.textAlign=o.align||'center'; ctx.textBaseline=o.base||'middle';
+ ctx.lineWidth=4; ctx.strokeStyle='rgba(255,255,255,0.92)'; ctx.lineJoin='round'; ctx.strokeText(s,x,y);
+ ctx.fillStyle=o.color||C.ink; ctx.fillText(s,x,y); ctx.restore();
+}
+function point(ctx,x,y,color,name,o={}){
+ ctx.save(); ctx.globalAlpha = o.alpha ?? 1;
+ ctx.beginPath(); ctx.arc(x,y,o.r||6.5,0,Math.PI*2); ctx.fillStyle=color; ctx.fill();
+ ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke();
+ ctx.restore();
+ if(name) label(ctx,name,x+(o.lx??10),y+(o.ly??-11),{color,size:13,weight:800});
+}
+function sideX(c,a,w){ let right=a.x<c.x; if(right && c.x+84>w) right=false; if(!right && c.x-84<0) right=true; return {x:c.x+(right?8:-8), align:right?'left':'right'}; }
+function clear(cv){ const c=cv._ctx; c.clearRect(0,0,cv._w,cv._h); return c; }
+const f2 = v => (isFinite(v)?v:0).toFixed(2);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const ease=u=>u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+const lerp=(a,b,k)=>a+(b-a)*k;
+const normLon=l=>((l+540)%360)-180;
+const lerpAng=(a,b,k)=>a+(((b-a+540)%360)-180)*k;
+
+/* ============================== 거리 함수 ============================== */
+const dE  =(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+const dL1 =(a,b)=>Math.abs(b.x-a.x)+Math.abs(b.y-a.y);
+const dInf=(a,b)=>Math.max(Math.abs(b.x-a.x),Math.abs(b.y-a.y));
+function dP(a,b,p,inf){ if(inf) return dInf(a,b); const x=Math.abs(b.x-a.x), y=Math.abs(b.y-a.y), m=Math.max(x,y); if(m===0) return 0; return m*Math.pow(Math.pow(x/m,p)+Math.pow(y/m,p),1/p); }
+function lens(r1,r2,d){
+ if(d>=r1+r2) return 0;
+ if(d<=Math.abs(r1-r2)) return Math.PI*Math.min(r1,r2)**2;
+ const a=r1*r1*Math.acos(clamp((d*d+r1*r1-r2*r2)/(2*d*r1),-1,1));
+ const b=r2*r2*Math.acos(clamp((d*d+r2*r2-r1*r1)/(2*d*r2),-1,1));
+ const c=0.5*Math.sqrt(Math.max(0,(-d+r1+r2)*(d+r1-r2)*(d-r1+r2)*(d+r1+r2)));
+ return a+b-c;
+}
+function haversine(A,B){
+ const p1=A.lat*D, p2=B.lat*D, dp=(B.lat-A.lat)*D, dl=(B.lon-A.lon)*D;
+ const h=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+ const sig=2*Math.asin(Math.sqrt(Math.min(1,h)));
+ return {d:R_EARTH*sig, sig};
+}
+
+/* ============================== 평면 좌표계 (1·4·6번) ============================== */
+const XR=7, YR=5.3;
+function planeTf(cv){ const w=cv._w,h=cv._h, sc=Math.min(w/(2*XR+1), h/(2*YR+0.6)); return {sc, f:p=>({x:w/2+p.x*sc, y:h/2-p.y*sc}), inv:(x,y)=>({x:(x-w/2)/sc, y:-(y-h/2)/sc})}; }
+function planeGrid(ctx,cv,tf){
+ const w=cv._w,h=cv._h;
+ for(let i=-XR;i<=XR;i++){ const x=w/2+i*tf.sc; line(ctx,x,0,x,h,i===0?'#D1D5DB':C.grid,1); }
+ for(let j=-6;j<=6;j++){ const y=h/2-j*tf.sc; line(ctx,0,y,w,y,j===0?'#D1D5DB':C.grid,1); }
+}
+const clampPlane=p=>({x:clamp(p.x,-XR+0.2,XR-0.2), y:clamp(p.y,-YR+0.2,YR-0.2)});
+
+function drawEuc(){
+ const cv=el.euc.cv, ctx=clear(cv), tf=planeTf(cv); planeGrid(ctx,cv,tf);
+ const a=tf.f(S.A), b=tf.f(S.B), c={x:b.x,y:a.y};
+ line(ctx,a.x,a.y,c.x,c.y,C.gray,1.5,[5,4]); line(ctx,c.x,c.y,b.x,b.y,C.gray,1.5,[5,4]);
+ const sx=Math.sign(a.x-c.x)||1, sy=Math.sign(b.y-c.y)||1, m=8;
+ ctx.save(); ctx.strokeStyle=C.gray; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(c.x+sx*m,c.y); ctx.lineTo(c.x+sx*m,c.y+sy*m); ctx.lineTo(c.x,c.y+sy*m); ctx.stroke(); ctx.restore();
+ const dx=S.B.x-S.A.x, dy=S.B.y-S.A.y;
+ label(ctx,`Δx = ${f2(Math.abs(dx))}`,(a.x+c.x)/2, a.y+(b.y<a.y?14:-12),{color:C.mute,size:11});
+ {const sx2=sideX(c,a,cv._w); label(ctx,`Δy = ${f2(Math.abs(dy))}`,sx2.x,(c.y+b.y)/2,{color:C.mute,size:11,align:sx2.align});}
+ arrow(ctx,a.x,a.y,b.x,b.y,{both:true,w:2.2,pad1:8,pad2:8});
+ const mx=(a.x+b.x)/2, my=(a.y+b.y)/2, L=Math.hypot(b.x-a.x,b.y-a.y)||1, nx=-(b.y-a.y)/L, ny=(b.x-a.x)/L, s=(nx*(c.x-mx)+ny*(c.y-my))>0?-16:16;
+ label(ctx,`d = ${f2(dE(S.A,S.B))}`,mx+nx*s,my+ny*s,{size:12,weight:700});
+ point(ctx,a.x,a.y,C.A,'A'); point(ctx,b.x,b.y,C.B,'B');
+}
+function drawMan(){
+ const cv=el.man.cv, ctx=clear(cv), tf=planeTf(cv); planeGrid(ctx,cv,tf);
+ const a=tf.f(S.A), b=tf.f(S.B), c={x:b.x,y:a.y}, c2={x:a.x,y:b.y};
+ line(ctx,a.x,a.y,c2.x,c2.y,'#D1D5DB',1.5,[3,4]); line(ctx,c2.x,c2.y,b.x,b.y,'#D1D5DB',1.5,[3,4]);
+ line(ctx,a.x,a.y,b.x,b.y,C.gray,1,[2,5]);
+ ctx.save(); ctx.strokeStyle=C.ink; ctx.lineWidth=2.6; ctx.lineJoin='round'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(c.x,c.y); ctx.stroke(); ctx.restore();
+ arrow(ctx,c.x,c.y,b.x,b.y,{w:2.6,pad2:8,head:10});
+ label(ctx,`|Δx| = ${f2(Math.abs(S.B.x-S.A.x))}`,(a.x+c.x)/2,a.y+(b.y<a.y?-12:14),{color:C.mute,size:11});
+ {const sx2=sideX(c,a,cv._w); label(ctx,`|Δy| = ${f2(Math.abs(S.B.y-S.A.y))}`,sx2.x,(c.y+b.y)/2,{color:C.mute,size:11,align:sx2.align});}
+ point(ctx,a.x,a.y,C.A,'A'); point(ctx,b.x,b.y,C.B,'B');
+}
+function drawCheb(){
+ const cv=el.cheb.cv, ctx=clear(cv), tf=planeTf(cv); planeGrid(ctx,cv,tf);
+ const a=tf.f(S.A), b=tf.f(S.B), c={x:b.x,y:a.y};
+ const ax=Math.abs(S.B.x-S.A.x), ay=Math.abs(S.B.y-S.A.y), d=Math.max(ax,ay), r=d*tf.sc;
+ ctx.save(); ctx.strokeStyle='rgba(17,24,39,0.25)'; ctx.setLineDash([4,4]); ctx.strokeRect(a.x-r,a.y-r,2*r,2*r); ctx.restore();
+ const xBig = ax>=ay;
+ if(xBig){ arrow(ctx,a.x,a.y,c.x,c.y,{w:3,pad1:7,head:10}); line(ctx,c.x,c.y,b.x,b.y,C.gray,1.5,[5,4]); }
+ else    { line(ctx,a.x,a.y,c.x,c.y,C.gray,1.5,[5,4]); arrow(ctx,c.x,c.y,b.x,b.y,{w:3,pad2:8,head:10}); }
+ label(ctx,`|Δx| = ${f2(ax)}`,(a.x+c.x)/2,a.y+(b.y<a.y?-12:14),{color:xBig?C.ink:C.gray,size:11,weight:xBig?800:500});
+ {const sx2=sideX(c,a,cv._w); label(ctx,`|Δy| = ${f2(ay)}`,sx2.x,(c.y+b.y)/2,{color:xBig?C.gray:C.ink,size:11,weight:xBig?500:800,align:sx2.align});}
+ point(ctx,a.x,a.y,C.A,'A'); point(ctx,b.x,b.y,C.B,'B');
+}
+
+/* ============================== 5. Minkowski ============================== */
+let minkSc = null;
+function minkTf(cv){
+ const w=cv._w,h=cv._h, d=dP(S.A,S.B,S.p,S.pInf);
+ const sc = (drag && drag.id==='mink') ? drag.sc : (Math.min(w,h)*0.38)/Math.max(d,0.3);
+ const cx=w/2, cy=h/2+4;
+ return {sc,cx,cy,d,f:p=>({x:cx+(p.x-S.A.x)*sc, y:cy-(p.y-S.A.y)*sc}), inv:(x,y)=>({x:S.A.x+(x-cx)/sc, y:S.A.y-(y-cy)/sc})};
+}
+function drawMink(){
+ const cv=el.mink.cv, ctx=clear(cv), tf=minkTf(cv), w=cv._w, h=cv._h, {cx,cy}=tf, r=tf.d*tf.sc;
+ line(ctx,0,cy,w,cy,C.grid,1); line(ctx,cx,0,cx,h,C.grid,1);
+ // guides
+ ctx.save(); ctx.strokeStyle=C.gray; ctx.lineWidth=1.2; ctx.setLineDash([5,4]);
+ ctx.beginPath(); ctx.moveTo(cx+r,cy); ctx.lineTo(cx,cy-r); ctx.lineTo(cx-r,cy); ctx.lineTo(cx,cy+r); ctx.closePath(); ctx.stroke();
+ ctx.strokeRect(cx-r,cy-r,2*r,2*r);
+ ctx.setLineDash([1.5,4]); ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke(); ctx.restore();
+ label(ctx,'p=1',cx+r*0.5+6,cy-r*0.5+6,{color:C.gray,size:10,align:'left'});
+ label(ctx,'p=∞',cx+r-3,cy-r-8,{color:C.gray,size:10,align:'right'});
+ // L_p ball
+ ctx.save(); ctx.beginPath();
+ if(S.pInf){ ctx.rect(cx-r,cy-r,2*r,2*r); }
+ else { const N=360, e=2/S.p; for(let i=0;i<=N;i++){ const t=i/N*Math.PI*2, co=Math.cos(t), si=Math.sin(t); const x=cx+r*Math.sign(co)*Math.pow(Math.abs(co),e), y=cy-r*Math.sign(si)*Math.pow(Math.abs(si),e); i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.closePath(); }
+ ctx.fillStyle=C.purF; ctx.fill(); ctx.strokeStyle=C.pur; ctx.lineWidth=2.2; ctx.stroke(); ctx.restore();
+ const b=tf.f(S.B);
+ arrow(ctx,cx,cy,b.x,b.y,{w:1.6,dash:[4,3],pad1:7,pad2:8,head:8});
+ label(ctx,`p = ${S.pInf?'∞':S.p.toFixed(2)}`,w-10,16,{color:C.pur,size:15,weight:800,align:'right'});
+ point(ctx,cx,cy,C.A,'A'); point(ctx,b.x,b.y,C.B,'B');
+}
+
+/* ============================== 2. Cosine ============================== */
+function cosTf(cv){ const w=cv._w,h=cv._h, ox=w*0.24, oy=h*0.8, sc=Math.min(w*0.68,h*0.7)/5.6; return {ox,oy,sc,f:v=>({x:ox+v.x*sc,y:oy-v.y*sc}), inv:(x,y)=>({x:(x-ox)/sc,y:-(y-oy)/sc})}; }
+function drawCos(){
+ const cv=el.cos.cv, ctx=clear(cv), w=cv._w, h=cv._h, tf=cosTf(cv), {ox,oy}=tf;
+ line(ctx,0,oy,w,oy,'#D1D5DB',1); line(ctx,ox,0,ox,h,'#D1D5DB',1);
+ const a=S.cos.a, b=S.cos.b, angA=Math.atan2(a.y,a.x), angB=Math.atan2(b.y,b.x);
+ const ray=ang=>{ const L=Math.hypot(w,h); line(ctx,ox,oy,ox+Math.cos(ang)*L,oy-Math.sin(ang)*L,C.gray,1,[2,5]); };
+ ray(angA); ray(angB);
+ let diff=angB-angA; diff=Math.atan2(Math.sin(diff),Math.cos(diff));
+ const rr=Math.min(38, 0.45*Math.min(Math.hypot(a.x,a.y),Math.hypot(b.x,b.y))*tf.sc);
+ ctx.save(); ctx.beginPath(); ctx.moveTo(ox,oy); ctx.arc(ox,oy,rr,-angA,-angA-diff,diff>0); ctx.closePath(); ctx.fillStyle='rgba(17,24,39,0.07)'; ctx.fill();
+ ctx.beginPath(); ctx.arc(ox,oy,rr,-angA,-angA-diff,diff>0); ctx.strokeStyle=C.ink; ctx.lineWidth=1.6; ctx.stroke(); ctx.restore();
+ const mid=angA+diff/2; label(ctx,'θ',ox+Math.cos(mid)*(rr+12),oy-Math.sin(mid)*(rr+12),{size:14,weight:700,color:C.ink});
+ const pa=tf.f(a), pb=tf.f(b);
+ arrow(ctx,ox,oy,pa.x,pa.y,{color:C.A,w:3,head:11,pad2:3});
+ arrow(ctx,ox,oy,pb.x,pb.y,{color:C.B,w:3,head:11,pad2:3});
+ point(ctx,pa.x,pa.y,C.A,'a',{r:5.5}); point(ctx,pb.x,pb.y,C.B,'b',{r:5.5});
+ ctx.beginPath(); ctx.arc(ox,oy,4.5,0,Math.PI*2); ctx.fillStyle=C.ink; ctx.fill();
+ label(ctx,`‖a‖ = ${f2(Math.hypot(a.x,a.y))}   ‖b‖ = ${f2(Math.hypot(b.x,b.y))}`,w-10,16,{size:11,color:C.mute,align:'right',weight:500});
+}
+
+/* ============================== 3. Hamming ============================== */
+function hamLayout(cv){ const w=cv._w,h=cv._h, cw=Math.min((w-56)/8,48), x0=(w-8*cw)/2+12, yA=h*0.2, yB=h*0.56; return {cw,x0,yA,yB,w,h}; }
+function drawHam(){
+ const cv=el.ham.cv, ctx=clear(cv), L=hamLayout(cv), {cw,x0,yA,yB}=L;
+ const gap=yB-(yA+cw);
+ for(let i=0;i<8;i++){
+  const x=x0+i*cw, diff=S.bitsA[i]!==S.bitsB[i];
+  label(ctx,String(i+1),x+cw/2,yA-10,{size:10,color:C.gray,weight:500});
+  if(diff){ ctx.fillStyle=C.hi; ctx.fillRect(x+1,yA-2,cw-2,yB+cw-yA+4); }
+ }
+ label(ctx,'A',x0-14,yA+cw/2,{color:C.A,size:14,weight:800}); label(ctx,'B',x0-14,yB+cw/2,{color:C.B,size:14,weight:800});
+ for(let i=0;i<8;i++){
+  const x=x0+i*cw, diff=S.bitsA[i]!==S.bitsB[i];
+  [[yA,S.bitsA[i],C.A,S.flA[i]],[yB,S.bitsB[i],C.B,S.flB[i]]].forEach(([y,bit,col,fl])=>{
+   ctx.fillStyle='#fff'; if(!diff) ctx.fillRect(x+3,y+3,cw-6,cw-6);
+   ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.strokeRect(x+3,y+3,cw-6,cw-6);
+   if(fl>0.01){ ctx.save(); ctx.strokeStyle=`rgba(245,158,11,${fl})`; ctx.lineWidth=4; ctx.strokeRect(x+1,y+1,cw-2,cw-2); ctx.restore(); }
+   ctx.save(); ctx.font=`700 ${Math.round(cw*0.5)}px ui-monospace,Menlo,monospace`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle=col; ctx.fillText(bit,x+cw/2,y+cw/2+1); ctx.restore();
+  });
+  if(diff && gap>14) arrow(ctx,x+cw/2,yA+cw-1,x+cw/2,yB+1,{both:true,w:1.6,head:6});
+ }
+ const yx=yB+cw+L.h*0.09;
+ label(ctx,'⊕',x0-14,yx,{size:13,color:C.mute});
+ for(let i=0;i<8;i++){ const v=S.bitsA[i]^S.bitsB[i]; label(ctx,String(v),x0+i*cw+cw/2,yx,{size:13,color:v?C.ink:'#D1D5DB',weight:v?800:500}); }
+}
+
+/* ============================== 7·9. Jaccard / Dice ============================== */
+const RSET=1, DMAX=2.6;
+function setTf(cv,which){
+ const w=cv._w,h=cv._h;
+ if(which==='jac'){ const sc=Math.min(w/5.4,h/3.3); return {sc,cx:w/2,cy:h/2}; }
+ const Lw=w*0.56, sc=Math.min(Lw/5.6,(h*0.56)/2.6); return {sc,cx:Lw/2,cy:h*0.31};
+}
+function drawCircles(ctx,tf,showLbl){
+ const {sc,cx,cy}=tf, d=S.setD, x1=cx-d/2*sc, x2=cx+d/2*sc, r=RSET*sc;
+ ctx.save();
+ ctx.beginPath(); ctx.arc(x1,cy,r,0,Math.PI*2); ctx.fillStyle='rgba(239,68,68,0.12)'; ctx.fill();
+ ctx.beginPath(); ctx.arc(x2,cy,r,0,Math.PI*2); ctx.fillStyle='rgba(37,99,235,0.12)'; ctx.fill();
+ ctx.save(); ctx.beginPath(); ctx.arc(x1,cy,r,0,Math.PI*2); ctx.clip(); ctx.beginPath(); ctx.arc(x2,cy,r,0,Math.PI*2); ctx.fillStyle='rgba(147,51,234,0.38)'; ctx.fill(); ctx.restore();
+ ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x1,cy,r,0,Math.PI*2); ctx.strokeStyle=C.A; ctx.stroke();
+ ctx.beginPath(); ctx.arc(x2,cy,r,0,Math.PI*2); ctx.strokeStyle=C.B; ctx.stroke();
+ ctx.restore();
+ label(ctx,'A',x1-r*0.62,cy-r*0.78,{color:C.A,size:14,weight:800});
+ label(ctx,'B',x2+r*0.62,cy-r*0.78,{color:C.B,size:14,weight:800});
+ if(showLbl && d<2*RSET-0.15) label(ctx,'A∩B',cx,cy,{color:'#581C87',size:11,weight:800});
+}
+function setVals(){ const I=lens(RSET,RSET,S.setD), A=Math.PI*RSET*RSET; return {J:I/(2*A-I), DSC:2*I/(2*A)}; }
+function drawJac(){
+ const cv=el.jac.cv, ctx=clear(cv), tf=setTf(cv,'jac'); drawCircles(ctx,tf,true);
+ const {J}=setVals(), w=cv._w, h=cv._h, bw=w*0.5, x=(w-bw)/2, y=h-18;
+ ctx.fillStyle='#F3F4F6'; ctx.fillRect(x,y-5,bw,10); ctx.fillStyle=C.pur; ctx.fillRect(x,y-5,bw*J,10);
+ ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.strokeRect(x,y-5,bw,10);
+ label(ctx,'0',x-8,y,{size:10,color:C.mute,align:'right'}); label(ctx,'1',x+bw+8,y,{size:10,color:C.mute,align:'left'});
+ label(ctx,`|A∩B| / |A∪B|`,w/2,16,{size:11,color:C.mute,weight:500});
+}
+function drawDice(){
+ const cv=el.dice.cv, ctx=clear(cv), w=cv._w, h=cv._h, tf=setTf(cv,'dice'); drawCircles(ctx,tf,false);
+ const {J,DSC}=setVals(), Lw=w*0.56, bx=34, bw=Lw-bx-44;
+ [[h*0.7,'J',J,C.pur],[h*0.85,'DSC',DSC,C.teal]].forEach(([y,n,v,col])=>{
+  label(ctx,n,bx-6,y,{size:11,weight:800,color:col,align:'right'});
+  ctx.fillStyle='#F3F4F6'; ctx.fillRect(bx,y-7,bw,14); ctx.fillStyle=col; ctx.fillRect(bx,y-7,bw*v,14);
+  ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.strokeRect(bx,y-7,bw,14);
+  label(ctx,v.toFixed(2),bx+bw+6,y,{size:11,weight:700,align:'left',color:col});
+ });
+ // 오른쪽: DSC vs J 곡선
+ const px0=Lw+22, px1=w-12, py0=22, py1=h-30, pw=px1-px0, ph=py1-py0;
+ ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.strokeRect(px0,py0,pw,ph);
+ line(ctx,px0,py1,px1,py0,C.gray,1,[4,4]);
+ ctx.save(); ctx.beginPath(); for(let i=0;i<=60;i++){ const j=i/60, ds=2*j/(1+j); const x=px0+j*pw, y=py1-ds*ph; i?ctx.lineTo(x,y):ctx.moveTo(x,y);} ctx.strokeStyle=C.teal; ctx.lineWidth=2.2; ctx.stroke(); ctx.restore();
+ const cxp=px0+J*pw, cyp=py1-DSC*ph;
+ line(ctx,cxp,py1,cxp,cyp,C.pur,1,[2,3]); line(ctx,px0,cyp,cxp,cyp,C.teal,1,[2,3]);
+ ctx.beginPath(); ctx.arc(cxp,cyp,5,0,Math.PI*2); ctx.fillStyle=C.ink; ctx.fill();
+ label(ctx,'J →',px1,py1+13,{size:10,color:C.pur,align:'right'});
+ label(ctx,'DSC',px0+2,py0-10,{size:10,color:C.teal,align:'left'});
+ label(ctx,'2J/(1+J)',px0+pw*0.5,py0+ph*0.22,{size:10,color:C.teal,align:'right'});
+ label(ctx,'y=x',px0+pw*0.78,py0+ph*0.38,{size:9,color:C.gray,weight:500});
+}
+
+/* ============================== 8. Haversine ============================== */
+function vec(g){ const p=g.lat*D, l=g.lon*D; return [Math.cos(p)*Math.cos(l),Math.cos(p)*Math.sin(l),Math.sin(p)]; }
+function proj(lat,lon,v){
+ const p=lat*D, l=lon*D, p0=v.lat0*D, l0=v.lon0*D;
+ const cosc=Math.sin(p0)*Math.sin(p)+Math.cos(p0)*Math.cos(p)*Math.cos(l-l0);
+ return {x:Math.cos(p)*Math.sin(l-l0), y:Math.cos(p0)*Math.sin(p)-Math.sin(p0)*Math.cos(p)*Math.cos(l-l0), vis:cosc>=0};
+}
+function unproj(x,y,v){
+ let r=Math.hypot(x,y); if(r>0.995){x*=0.995/r;y*=0.995/r;r=0.995;}
+ if(r<1e-9) return {lat:v.lat0,lon:v.lon0};
+ const c=Math.asin(r), p0=v.lat0*D, l0=v.lon0*D;
+ const lat=Math.asin(Math.cos(c)*Math.sin(p0)+y*Math.sin(c)*Math.cos(p0)/r);
+ const lon=l0+Math.atan2(x*Math.sin(c), r*Math.cos(c)*Math.cos(p0)-y*Math.sin(c)*Math.sin(p0));
+ return {lat:lat/D, lon:normLon(lon/D)};
+}
+function geoTf(cv){ const w=cv._w,h=cv._h, R=Math.min(w,h)*0.42; return {R,cx:w/2,cy:h/2+2}; }
+function strokeGeo(ctx,tf,pts,vis,style){
+ ctx.save(); ctx.strokeStyle=style.color; ctx.lineWidth=style.w; if(style.dash) ctx.setLineDash(style.dash);
+ ctx.beginPath(); let pen=false;
+ for(const q of pts){ const pr=proj(q[0],q[1],S.view); if(pr.vis===vis){ const X=tf.cx+pr.x*tf.R, Y=tf.cy-pr.y*tf.R; pen?ctx.lineTo(X,Y):ctx.moveTo(X,Y); pen=true; } else pen=false; }
+ ctx.stroke(); ctx.restore();
+}
+function gcPoints(A,B,N=90){
+ const v1=vec(A), v2=vec(B), dot=clamp(v1[0]*v2[0]+v1[1]*v2[1]+v1[2]*v2[2],-1,1), w=Math.acos(dot), out=[];
+ if(w<1e-6) return [[A.lat,A.lon],[B.lat,B.lon]];
+ const s=Math.sin(w);
+ for(let i=0;i<=N;i++){ const t=i/N, a=Math.sin((1-t)*w)/s, b=Math.sin(t*w)/s; const x=a*v1[0]+b*v2[0], y=a*v1[1]+b*v2[1], z=a*v1[2]+b*v2[2]; out.push([Math.asin(clamp(z,-1,1))/D, Math.atan2(y,x)/D]); }
+ return out;
+}
+let gcPhase=0;
+function drawHav(){
+ const cv=el.hav.cv, ctx=clear(cv), tf=geoTf(cv), {R,cx,cy}=tf;
+ ctx.save(); ctx.beginPath(); ctx.ellipse(cx+4,cy+R+6,R*0.75,R*0.08,0,0,Math.PI*2); ctx.fillStyle='rgba(17,24,39,0.08)'; ctx.fill();
+ const g=ctx.createRadialGradient(cx-R*0.35,cy-R*0.4,R*0.1,cx,cy,R); g.addColorStop(0,'#FFFFFF'); g.addColorStop(0.65,'#EEF2F7'); g.addColorStop(1,'#CBD5E1');
+ ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.fillStyle=g; ctx.fill(); ctx.restore();
+ for(let lon=-180;lon<180;lon+=30){ const pts=[]; for(let la=-90;la<=90;la+=3) pts.push([la,lon]); strokeGeo(ctx,tf,pts,true,{color:'#B6C2D2',w:0.9}); }
+ for(let la=-60;la<=60;la+=30){ const pts=[]; for(let lo=-180;lo<=180;lo+=3) pts.push([la,lo]); strokeGeo(ctx,tf,pts,true,{color:la===0?'#94A3B8':'#B6C2D2',w:la===0?1.4:0.9}); }
+ ctx.beginPath(); ctx.arc(cx,cy,R,0,Math.PI*2); ctx.strokeStyle=C.ink; ctx.lineWidth=1.2; ctx.stroke();
+ const gc=gcPoints(S.gA,S.gB);
+ strokeGeo(ctx,tf,gc,false,{color:'rgba(147,51,234,0.35)',w:2,dash:[4,4]});
+ strokeGeo(ctx,tf,gc,true,{color:C.pur,w:3.2});
+ // 이동 점
+ const k=Math.min(gc.length-1, Math.floor(gcPhase*(gc.length-1))), m=proj(gc[k][0],gc[k][1],S.view);
+ if(m.vis && gc.length>2){ ctx.beginPath(); ctx.arc(cx+m.x*R,cy-m.y*R,3.6,0,Math.PI*2); ctx.fillStyle=C.pur; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke(); }
+ [[S.gA,C.A,'A'],[S.gB,C.B,'B']].forEach(([gp,col,n])=>{ const pr=proj(gp.lat,gp.lon,S.view); point(ctx,cx+pr.x*R,cy-pr.y*R,col,n,{alpha:pr.vis?1:0.3}); });
+}
+
+/* ============================== 업데이트(애니메이션) ============================== */
+const PK=[1,2,4,10,1], PSEG=3.6;
+function pAt(t){ const n=PK.length-1, cyc=t%(n*PSEG), i=Math.floor(cyc/PSEG), u=clamp((cyc-i*PSEG-0.8)/2.8,0,1); return PK[i]+(PK[i+1]-PK[i])*ease(u); }
+function update(dt){
+ for(const g in S.hold) if(active(g)) S.t[g]+=dt;
+ const k=1-Math.exp(-dt*3);
+ if(active('plane')){
+  const t=S.t.plane;
+  const tA={x:-3.0+0.9*Math.sin(t*0.23), y:-2.3+0.7*Math.cos(t*0.31)};
+  const tB={x:3.4+2.2*Math.sin(t*0.5), y:1.4+3.0*Math.sin(t*0.37+1)};
+  S.A.x=lerp(S.A.x,tA.x,k); S.A.y=lerp(S.A.y,tA.y,k); S.B.x=lerp(S.B.x,tB.x,k); S.B.y=lerp(S.B.y,tB.y,k);
+ }
+ if(S.playing && S.pAuto){ S.t.p+=dt; S.p=pAt(S.t.p); S.pInf=false; }
+ if(active('cos')){
+  const t=S.t.cos, aA=0.32+0.3*Math.sin(t*0.4), aB=1.0+0.45*Math.sin(t*0.29+1), LA=4.0+1.1*Math.sin(t*0.7), LB=3.4+1.3*Math.sin(t*0.53+2);
+  S.cos.a.x=lerp(S.cos.a.x,LA*Math.cos(aA),k); S.cos.a.y=lerp(S.cos.a.y,LA*Math.sin(aA),k);
+  S.cos.b.x=lerp(S.cos.b.x,LB*Math.cos(aB),k); S.cos.b.y=lerp(S.cos.b.y,LB*Math.sin(aB),k);
+ }
+ if(active('ham')){
+  S.hamClock+=dt;
+  if(S.hamClock>1.25){ S.hamClock=0;
+   const diffIdx=[], sameIdx=[]; for(let i=0;i<8;i++) (S.bitsA[i]!==S.bitsB[i]?diffIdx:sameIdx).push(i);
+   const pick=arr=>arr[Math.floor(Math.random()*arr.length)];
+   const i = diffIdx.length>=4 ? pick(diffIdx) : diffIdx.length<=1 ? pick(sameIdx) : Math.floor(Math.random()*8);
+   if(Math.random()<0.7){ S.bitsB[i]^=1; S.flB[i]=1; } else { S.bitsA[i]^=1; S.flA[i]=1; }
+  }
+ }
+ for(let i=0;i<8;i++){ S.flA[i]*=Math.exp(-dt*2.2); S.flB[i]*=Math.exp(-dt*2.2); }
+ if(active('set')){ const tD=(2*RSET+0.25)*(0.5-0.5*Math.cos(S.t.set*0.45+1.4)); S.setD=lerp(S.setD,tD,k); }
+ if(active('geo')){
+  const t=S.t.geo, tB={lat:22+28*Math.sin(t*0.21), lon:normLon(160+60*Math.sin(t*0.15))};
+  S.gA.lat=lerp(S.gA.lat,37.57,k); S.gA.lon=lerpAng(S.gA.lon,126.98,k);
+  S.gB.lat=lerp(S.gB.lat,tB.lat,k); S.gB.lon=normLon(lerpAng(S.gB.lon,tB.lon,k));
+  const a=S.gA.lon*D, b=S.gB.lon*D, mid=Math.atan2(Math.sin(a)+Math.sin(b),Math.cos(a)+Math.cos(b))/D;
+  S.view.lon0=normLon(lerpAng(S.view.lon0, mid+18*Math.sin(t*0.3), k*0.6));
+  S.view.lat0=lerp(S.view.lat0, clamp((S.gA.lat+S.gB.lat)/2,-60,60)*0.85, k*0.6);
+ }
+ if(S.playing) gcPhase=(gcPhase+dt*0.28)%1;
+}
+
+/* ============================== 수치 표시 ============================== */
+const last={};
+function setTxt(node,key,html){ if(last[key]!==html){ node.innerHTML=html; last[key]=html; } }
+function updateNumbers(){
+ const L=T[S.lang], dx=Math.abs(S.B.x-S.A.x), dy=Math.abs(S.B.y-S.A.y);
+ setTxt(el.euc.val,'ev',`d = ${f2(dE(S.A,S.B))}`); setTxt(el.euc.sub,'es',`Δx = ${f2(dx)}<br>Δy = ${f2(dy)}`);
+ setTxt(el.man.val,'mv',`d = ${f2(dL1(S.A,S.B))}`); setTxt(el.man.sub,'ms',`${f2(dx)} + ${f2(dy)}`);
+ setTxt(el.cheb.val,'cv',`d = ${f2(dInf(S.A,S.B))}`); setTxt(el.cheb.sub,'cs',`max(${f2(dx)}, ${f2(dy)})<br>→ ${dx>=dy?'|Δx|':'|Δy|'}`);
+ setTxt(el.mink.val,'kv',`d = ${f2(dP(S.A,S.B,S.p,S.pInf))}`);
+ setTxt(el.mink.sub,'ks',`<span style="color:${C.pur};font-weight:700">p = ${S.pInf?'∞':S.p.toFixed(2)}</span><br>L₁ ${f2(dL1(S.A,S.B))} · L₂ ${f2(dE(S.A,S.B))} · L∞ ${f2(dInf(S.A,S.B))}`);
+ const a=S.cos.a,b=S.cos.b, na=Math.hypot(a.x,a.y), nb=Math.hypot(b.x,b.y), cs=(a.x*b.x+a.y*b.y)/(na*nb||1), th=Math.acos(clamp(cs,-1,1))/D;
+ setTxt(el.cos.val,'osv',`cos θ = ${f2(cs)}`); setTxt(el.cos.sub,'oss',`θ = ${th.toFixed(1)}°<br>d<sub>cos</sub> = 1 − cos θ = ${f2(1-cs)}`);
+ let hd=0; for(let i=0;i<8;i++) hd+=S.bitsA[i]!==S.bitsB[i];
+ setTxt(el.ham.val,'hv',`d = ${hd}`); setTxt(el.ham.sub,'hs',`${hd} / 8 ${L.diff}<br>${S.bitsA.join('')} vs ${S.bitsB.join('')}`);
+ const sv=setVals();
+ setTxt(el.jac.val,'jv',`J = ${f2(sv.J)}`); setTxt(el.jac.sub,'js',`d<sub>J</sub> = 1 − J = ${f2(1-sv.J)}`);
+ setTxt(el.dice.val,'dv',`DSC = ${f2(sv.DSC)}`); setTxt(el.dice.sub,'ds',`J = ${f2(sv.J)}<br>DSC − J = ${f2(sv.DSC-sv.J)}`);
+ const hv=haversine(S.gA,S.gB), fmt=g=>`${Math.abs(g.lat).toFixed(1)}°${g.lat>=0?'N':'S'} ${Math.abs(g.lon).toFixed(1)}°${g.lon>=0?'E':'W'}`;
+ setTxt(el.hav.val,'gv',`d = ${Math.round(hv.d).toLocaleString('en-US')} km`);
+ setTxt(el.hav.sub,'gs',`<span style="color:${C.A}">A</span> ${fmt(S.gA)} · <span style="color:${C.B}">B</span> ${fmt(S.gB)}<br>Δσ = ${(hv.sig/D).toFixed(1)}° · r = 6,371 km`);
+ // p UI
+ const pv=document.getElementById('pval'); const ps=S.pInf?'p = ∞':`p = ${S.p.toFixed(2)}`; if(pv.textContent!==ps) pv.textContent=ps;
+ const sl=document.getElementById('pslider'); if(document.activeElement!==sl) sl.value = S.pInf?10:S.p;
+ document.querySelectorAll('button.pp').forEach(bn=>{ const v=bn.dataset.p; bn.classList.toggle('on', !S.pAuto && (v==='inf'?S.pInf:(!S.pInf && Math.abs(S.p-(+v))<0.005))); });
+ document.getElementById('pauto').checked=S.pAuto;
+}
+
+/* ============================== 드래그 / 클릭 ============================== */
+let drag=null;
+const near=(p,q,r=20)=>Math.hypot(p.x-q.x,p.y-q.y)<r;
+const HIT = {
+ euc: p=>{ const tf=planeTf(el.euc.cv); return near(p,tf.f(S.B))?'B':near(p,tf.f(S.A))?'A':null; },
+ man: p=>{ const tf=planeTf(el.man.cv); return near(p,tf.f(S.B))?'B':near(p,tf.f(S.A))?'A':null; },
+ cheb:p=>{ const tf=planeTf(el.cheb.cv); return near(p,tf.f(S.B))?'B':near(p,tf.f(S.A))?'A':null; },
+ mink:p=>{ const tf=minkTf(el.mink.cv); return near(p,tf.f(S.B),22)?'B':null; },
+ cos: p=>{ const tf=cosTf(el.cos.cv); return near(p,tf.f(S.cos.b))?'b':near(p,tf.f(S.cos.a))?'a':null; },
+ ham: p=>{ const L=hamLayout(el.ham.cv); const i=Math.floor((p.x-L.x0)/L.cw); if(i<0||i>7) return null; if(p.y>=L.yA&&p.y<=L.yA+L.cw) return {row:'A',i}; if(p.y>=L.yB&&p.y<=L.yB+L.cw) return {row:'B',i}; return null; },
+ jac: p=>setHit(p,'jac'), dice:p=>setHit(p,'dice'),
+ hav: p=>{ const tf=geoTf(el.hav.cv); for(const [n,g] of [['B',S.gB],['A',S.gA]]){ const pr=proj(g.lat,g.lon,S.view); if(pr.vis && near(p,{x:tf.cx+pr.x*tf.R,y:tf.cy-pr.y*tf.R},22)) return n; } return Math.hypot(p.x-tf.cx,p.y-tf.cy)<tf.R?'rot':null; },
+};
+function setHit(p,which){ const tf=setTf(el[which].cv,which), r=RSET*tf.sc; if(Math.abs(p.y-tf.cy)>r) return null; const x1=tf.cx-S.setD/2*tf.sc, x2=tf.cx+S.setD/2*tf.sc; if(Math.hypot(p.x-x2,p.y-tf.cy)<r) return 'B'; if(Math.hypot(p.x-x1,p.y-tf.cy)<r) return 'A'; return null; }
+function moveDrag(p){
+ const {id,t}=drag;
+ if(id==='euc'||id==='man'||id==='cheb'){ const tf=planeTf(el[id].cv); const w=clampPlane(tf.inv(p.x,p.y)); if(t==='A') S.A=w; else S.B=w; }
+ else if(id==='mink'){ const tf=minkTf(el.mink.cv); S.B=clampPlane(tf.inv(p.x,p.y)); }
+ else if(id==='cos'){ const tf=cosTf(el.cos.cv); let v=tf.inv(p.x,p.y); const L=Math.hypot(v.x,v.y); if(L<0.4){ v={x:v.x/(L||1)*0.4,y:v.y/(L||1)*0.4}; } if(L>6.5){ v={x:v.x/L*6.5,y:v.y/L*6.5}; } S.cos[t]=v; }
+ else if(id==='jac'||id==='dice'){ const tf=setTf(el[id].cv,id); S.setD=clamp(2*Math.abs(p.x-tf.cx)/tf.sc,0,DMAX); }
+ else if(id==='hav'){ const tf=geoTf(el.hav.cv);
+  if(t==='rot'){ const dx=p.x-drag.lx, dy=p.y-drag.ly; S.view.lon0=normLon(S.view.lon0-dx/tf.R*57.3); S.view.lat0=clamp(S.view.lat0+dy/tf.R*57.3,-80,80); drag.lx=p.x; drag.ly=p.y; }
+  else { const g=unproj((p.x-tf.cx)/tf.R,-(p.y-tf.cy)/tf.R,S.view); if(t==='A') S.gA=g; else S.gB=g; }
+ }
+}
+function pos(cv,e){ const r=cv.getBoundingClientRect(); const s=e.touches?e.touches[0]:e; return {x:s.clientX-r.left, y:s.clientY-r.top}; }
+const HOLD_MS=4000;
+CARDS.forEach(c=>{
+ const cv=el[c.id].cv, g=el[c.id].g;
+ cv.addEventListener('touchstart',e=>{ if(HIT[c.id](pos(cv,e))) e.preventDefault(); },{passive:false});
+ cv.addEventListener('pointerdown',e=>{
+  const p=pos(cv,e), t=HIT[c.id](p); if(!t) return;
+  e.preventDefault(); S.hold[g]=now()+HOLD_MS;
+  if(c.id==='ham'){ const arr=t.row==='A'?S.bitsA:S.bitsB, fl=t.row==='A'?S.flA:S.flB; arr[t.i]^=1; fl[t.i]=1; S.hamClock=0; return; }
+  drag={id:c.id,t,g,lx:p.x,ly:p.y,sc:c.id==='mink'?minkTf(cv).sc:null};
+  try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+  cv.style.cursor='grabbing';
+ });
+ cv.addEventListener('pointermove',e=>{
+  const p=pos(cv,e);
+  if(drag && drag.id===c.id){ S.hold[g]=now()+HOLD_MS; moveDrag(p); return; }
+  if(e.pointerType==='mouse'){ const t=HIT[c.id](p); cv.style.cursor = t ? (c.id==='ham'?'pointer':'grab') : 'default'; }
+ });
+ const end=()=>{ if(drag && drag.id===c.id){ S.hold[g]=now()+HOLD_MS; drag=null; cv.style.cursor='default'; } };
+ cv.addEventListener('pointerup',end); cv.addEventListener('pointercancel',end); cv.addEventListener('lostpointercapture',end);
+});
+
+/* ============================== 컨트롤 ============================== */
+document.getElementById('play').onclick=()=>{ S.playing=!S.playing; if(S.playing) for(const g in S.hold) S.hold[g]=0; syncPlay(); };
+document.getElementById('reset').onclick=()=>{ initState(); for(const k in last) delete last[k]; gcPhase=0; syncPlay(); };
+document.getElementById('lang').onclick=()=>{ S.lang=S.lang==='ko'?'en':'ko'; for(const k in last) delete last[k]; applyLang(); };
+document.getElementById('pslider').addEventListener('input',e=>{ S.pAuto=false; S.pInf=false; S.p=+e.target.value; });
+document.querySelectorAll('button.pp').forEach(b=>b.onclick=()=>{ S.pAuto=false; if(b.dataset.p==='inf'){ S.pInf=true; } else { S.pInf=false; S.p=+b.dataset.p; } });
+document.getElementById('pauto').addEventListener('change',e=>{ S.pAuto=e.target.checked; if(S.pAuto){ S.pInf=false; } });
+
+/* ============================== 메인 루프 ============================== */
+let lastTs=0;
+function frame(ts){
+ const dt=Math.min(0.05,(ts-(lastTs||ts))/1000); lastTs=ts;
+ update(dt);
+ drawEuc(); drawCos(); drawHam(); drawMan(); drawMink(); drawCheb(); drawJac(); drawHav(); drawDice();
+ updateNumbers();
+ requestAnimationFrame(frame);
+}
+applyLang();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
